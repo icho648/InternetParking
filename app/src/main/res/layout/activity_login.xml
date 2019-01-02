@@ -4,10 +4,12 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context="com.example.icho.internetparking.activity.reserveActivity">
-    <TextView
+    tools:context=".activity.LoginActivity">
+
+    <Button
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:id="@+id/test"/>
+        android:id="@+id/login_button"
+        android:text="登录"/>
 
 </android.support.constraint.ConstraintLayout>
