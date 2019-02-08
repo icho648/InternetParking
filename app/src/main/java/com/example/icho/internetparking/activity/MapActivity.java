@@ -1,6 +1,8 @@
 package com.example.icho.internetparking.activity;
 
 import android.content.Intent;
+import android.os.Handler;
+import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 
@@ -47,49 +49,130 @@ import java.util.List;
 import com.example.icho.internetparking.cla.mapListItem;
 import com.example.icho.internetparking.adapter.mapListItemAdapter;
 
-public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSearchListener, AMap.OnMyLocationChangeListener {
+public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSearchListener {
     MapView mapView = null;
     AMap aMap = null;
     LatLonPoint myPoint = null;
+    LatLonPoint searchPoint=null;
     FloatingActionButton fab;
     BottomSheetBehavior sheetBehavior;
     List<mapListItem> listItems = new ArrayList<>();
-    Button beforeButton = null;
-    Button nextButton = null;
     RecyclerView mapRecycleView = null;
     int page = 1;
     int pageCount = 0;
     mapListItemAdapter adapter = null;
+    View bottomSheet=null;
+    boolean isExit=false;
+
+    public void initViews(){
+        mapView = findViewById(R.id.map);
+        bottomSheet = findViewById(R.id.recycle_view);
+        sheetBehavior = BottomSheetBehavior.from(bottomSheet);
+        fab = findViewById(R.id.fab);
+        mapRecycleView = findViewById(R.id.recycle_view);
+    }
+
+    public void initEvents(){
+        fab.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (!(listItems.isEmpty()))
+                    listItems.clear();//清空poi列表
+                aMap.clear();//清空标记
+                searchPoint=myPoint;
+                page = 1;
+                searchPoi(searchPoint);
+                sheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+
+
+            }
+        });
+
+        sheetBehavior.setBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
+            @SuppressLint("RestrictedApi")
+            @Override
+            public void onStateChanged(@NonNull View bottomSheet, int newState) {
+                switch (newState) {
+                    case BottomSheetBehavior.STATE_COLLAPSED:
+                        fab.setVisibility(View.VISIBLE);
+                        aMap.animateCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition(new LatLng(myPoint.getLatitude(), myPoint.getLongitude()), 16, 0, 0)));
+                        break;
+                    case BottomSheetBehavior.STATE_EXPANDED:
+                        fab.setVisibility(View.GONE);
+                        break;
+                    default:
+                }
+            }
+
+            @Override
+            public void onSlide(@NonNull View bottomSheet, float slideOffset) {
+                //这里是拖拽中的回调，根据slideOffset可以做一些动画
+            }
+        });
+    }
+
+    public void initAdapter(){
+        mapRecycleView.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false));
+        final Intent intent = new Intent(MapActivity.this, reserveActivity.class);
+        adapter = new mapListItemAdapter(R.layout.map_list_item, listItems);
+        adapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
+            @Override
+            public void onItemClick(BaseQuickAdapter adapter, View view, int position) {
+                mapListItem item = (mapListItem) adapter.getItem(position);
+                Bundle bundle = new Bundle();
+                bundle.putString("info", item.getInfo());
+                bundle.putString("title", item.getTitle());
+                bundle.putString("price", item.getPrice());
+                bundle.putString("available", item.getAvailable());
+                intent.putExtras(bundle);
+                startActivity(intent);
+            }
+        });
+        adapter.setOnLoadMoreListener(new BaseQuickAdapter.RequestLoadMoreListener() {//下拉加载更多
+            @Override
+            public void onLoadMoreRequested() {
+                mapRecycleView.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (page>=pageCount){
+                            adapter.loadMoreEnd();
+                        }
+                        else {
+                            page++;
+                            searchPoi(searchPoint);
+                            adapter.loadMoreComplete();
+                        }
+                    }
+                },1000);
+            }
+        },mapRecycleView);
+        mapRecycleView.setAdapter(adapter);
+
+    }
+
+
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_map);
-        mapView = findViewById(R.id.map);
 
-
-        View bottomSheet = findViewById(R.id.bottom_sheet);
-        sheetBehavior = BottomSheetBehavior.from(bottomSheet);
-        fab = findViewById(R.id.fab);
-        beforeButton = findViewById(R.id.before);
-        nextButton = findViewById(R.id.next);
-        mapRecycleView = findViewById(R.id.recycle_view);
-        mapRecycleView.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false));
-        List list = new ArrayList<mapListItem>();
-        adapter = new mapListItemAdapter(R.id.recycle_view, list);
-        mapRecycleView.setAdapter(adapter);
+        initViews();
+        initEvents();
+        initAdapter();
 
         mapView.onCreate(savedInstanceState);// 此方法必须重写
         aMap = mapView.getMap();
-        aMap.setOnMyLocationChangeListener(this);
-
-
+        aMap.setOnMyLocationChangeListener(new AMap.OnMyLocationChangeListener() {
+            @Override
+            public void onMyLocationChange(Location location) {
+                myPoint = new LatLonPoint(location.getLatitude(), location.getLongitude());
+            }
+        });//监听位置改变
         UiSettings uiSettings = aMap.getUiSettings();
         uiSettings.setZoomControlsEnabled(false);//取消放大缩小按钮
-
-        MyLocationStyle myLocationStyle;
-        myLocationStyle = new MyLocationStyle();//初始化定位蓝点样式类myLocationStyle.myLocationType(MyLocationStyle.LOCATION_TYPE_LOCATION_ROTATE);
-
+        MyLocationStyle myLocationStyle = new MyLocationStyle();//初始化定位蓝点样式类myLocationStyle.myLocationType(MyLocationStyle.LOCATION_TYPE_LOCATION_ROTATE);
         myLocationStyle.myLocationType(MyLocationStyle.LOCATION_TYPE_LOCATION_ROTATE_NO_CENTER);//连续定位、蓝点不会移动到地图中心点，定位点依照设备方向旋转，并且蓝点会跟随设备移动。
         myLocationStyle.interval(2000); //设置连续定位模式下的定位间隔，只在连续定位模式下生效，单次定位模式下不会生效。单位为毫秒。
         aMap.setMyLocationStyle(myLocationStyle);//设置定位蓝点的Style
@@ -110,74 +193,58 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
             }
         }).start();
 
-        fab.setOnClickListener(new View.OnClickListener() {
-            @SuppressLint("RestrictedApi")
-            @Override
-            public void onClick(View v) {
-                searchPoi(1);
-                page = 1;
-                sheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
-                fab.setVisibility(View.GONE);
 
-            }
-        });
 
-        beforeButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (page == 1) {
-
-                } else {
-                    page = page - 1;
-                    searchPoi(page);
-                }
-            }
-        });
-
-        nextButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (page < pageCount) {
-                    page = page + 1;
-                    searchPoi(page);
-                }
-            }
-        });
-
-        sheetBehavior.setBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
-            @SuppressLint("RestrictedApi")
-            @Override
-            public void onStateChanged(@NonNull View bottomSheet, int newState) {
-                switch (newState) {
-                    case BottomSheetBehavior.STATE_COLLAPSED:
-                        fab.setVisibility(View.VISIBLE);
-                        break;
-                    default:
-                }
-            }
-
-            @Override
-            public void onSlide(@NonNull View bottomSheet, float slideOffset) {
-                //这里是拖拽中的回调，根据slideOffset可以做一些动画
-            }
-        });
 
     }
 
+    @SuppressLint("HandlerLeak")
+    Handler mHandler = new Handler() {
 
-    public void searchPoi(int i) {
-        aMap.clear();
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+            isExit = false;
+        }
+
+    };
+
+    @SuppressLint("RestrictedApi")
+    @Override
+    public void onBackPressed() {
+        if (sheetBehavior.getState() == BottomSheetBehavior.STATE_EXPANDED) {
+            sheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+            fab.setVisibility(View.VISIBLE);
+            aMap.animateCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition(new LatLng(myPoint.getLatitude(), myPoint.getLongitude()), 16, 0, 0)));
+        }
+        else {
+            if (!isExit) {
+                isExit = true;
+                Toast.makeText(getApplicationContext(), "再按一次退出程序", Toast.LENGTH_SHORT).show();
+                mHandler.sendEmptyMessageDelayed(0, 2000);
+            } else {
+                finish();
+            }
+        }
+
+
+    }
+
+    public void searchPoi(LatLonPoint searchPoint) {
         PoiSearch.Query query = new PoiSearch.Query("", "150900");
         //keyWord表示搜索字符串，
         //第二个参数表示POI搜索类型，二者选填其一，选用POI搜索类型时建议填写类型代码，码表可以参考下方（而非文字）
         //cityCode表示POI搜索区域，可以是城市编码也可以是城市名称，也可以传空字符串，空字符串代表全国在全国范围内进行搜索
         query.setPageSize(10);// 设置每页最多返回多少条poiitem
-        query.setPageNum(i);//设置查询页码
+        query.setPageNum(page);//设置查询页码
         PoiSearch poiSearch = new PoiSearch(MapActivity.this, query);
         poiSearch.setOnPoiSearchListener(MapActivity.this);
-        poiSearch.setBound(new PoiSearch.SearchBound(new LatLonPoint(myPoint.getLatitude(), myPoint.getLongitude()), 3000));
+        poiSearch.setBound(new PoiSearch.SearchBound(new LatLonPoint(searchPoint.getLatitude(), searchPoint.getLongitude()), 3000));
         poiSearch.searchPOIAsyn();
-        aMap.animateCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition(new LatLng(myPoint.getLatitude() - 0.009, myPoint.getLongitude()), 15, 0, 0)));
+        //if (page==1)
+            aMap.animateCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition(new LatLng(searchPoint.getLatitude() - 0.0055, searchPoint.getLongitude()), 16, 0, 0)));
+        //else
+            //aMap.animateCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition(new LatLng(searchPoint.getLatitude() - 0.009, searchPoint.getLongitude()), 15, 0, 0)));
         //缩小地图并将POI移至上方
     }
 
@@ -189,40 +256,22 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
 
     @Override
     public void onPoiSearched(PoiResult poiResult, final int i) {
-        if (!(listItems.isEmpty()))
-            listItems.clear();
+
         pageCount = poiResult.getPageCount();
         ArrayList<PoiItem> poiItems = poiResult.getPois();
-        final Intent intent = new Intent(MapActivity.this, reserveActivity.class);
 
         for (PoiItem item : poiItems) {
             LatLng latLng = new LatLng(item.getLatLonPoint().getLatitude(), item.getLatLonPoint().getLongitude());
-            aMap.addMarker(new MarkerOptions().position(latLng));
+            if (page==1)
+                aMap.addMarker(new MarkerOptions().position(latLng));
             mapListItem listItem = new mapListItem(item.getTitle(), +item.getDistance() + "米  " + item.getSnippet(), "￥10/h", "有车位");
             listItems.add(listItem);
         }
-        adapter = new mapListItemAdapter(R.layout.map_list_item, listItems);
-        adapter.setOnItemClickListener(new BaseQuickAdapter.OnItemClickListener() {
-            @Override
-            public void onItemClick(BaseQuickAdapter adapter, View view, int position) {
-                mapListItem item = (mapListItem) adapter.getItem(position);
-                Bundle bundle = new Bundle();
-                bundle.putString("info", item.getInfo());
-                bundle.putString("title", item.getTitle());
-                bundle.putString("price", item.getPrice());
-                bundle.putString("available", item.getAvailable());
-                intent.putExtras(bundle);
-                startActivity(intent);
-            }
-        });
-        mapRecycleView.setAdapter(adapter);
+       adapter.notifyDataSetChanged();
 
     }
 
-    @Override
-    public void onMyLocationChange(Location location) {
-        myPoint = new LatLonPoint(location.getLatitude(), location.getLongitude());
-    }
+
 
     @Override
     protected void onDestroy() {
