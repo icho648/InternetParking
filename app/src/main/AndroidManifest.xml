@@ -47,6 +47,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".activity.walletActivity" />
+        <activity android:name=".activity.settingsActivity" />
+        <activity android:name=".activity.myOrderActivity"></activity>
     </application>
 
 </manifest>

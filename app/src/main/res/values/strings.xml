@@ -7,4 +7,10 @@
     <string name="check_login">自动登录</string>
     <string name="login">登录</string>
     <string name="loading">正在加载数据</string>
+    <string name="search">搜索</string>
+    <string name="input">请输入搜索地点</string>
+    <string name="order">订单</string>
+    <string name="wallet">钱包</string>
+    <string name="settings">设置</string>
+    <string name="title_activity_wallet">walletActivity</string>
 </resources>

@@ -3,6 +3,9 @@ package com.example.icho.internetparking.activity;
 import android.content.Intent;
 import android.os.Handler;
 import android.os.Message;
+import android.support.design.widget.NavigationView;
+import android.support.v4.view.GravityCompat;
+import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 
@@ -24,9 +27,12 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.view.MenuItem;
 import android.view.View;
 
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 import com.amap.api.maps.AMap;
@@ -63,6 +69,10 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
     mapListItemAdapter adapter = null;
     View bottomSheet=null;
     boolean isExit=false;
+    DrawerLayout drawerLayout = null;
+    Button homeButton = null;
+    EditText searchEdit = null;
+    NavigationView navigationView = null;
 
     public void initViews(){
         mapView = findViewById(R.id.map);
@@ -70,6 +80,10 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
         sheetBehavior = BottomSheetBehavior.from(bottomSheet);
         fab = findViewById(R.id.fab);
         mapRecycleView = findViewById(R.id.recycle_view);
+        drawerLayout = findViewById(R.id.drawer_layout);
+        homeButton = findViewById(R.id.button_home);
+        searchEdit = findViewById(R.id.edit_search);
+        navigationView = findViewById(R.id.nav_view);
     }
 
     public void initEvents(){
@@ -83,8 +97,15 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
                 page = 1;
                 searchPoi(searchPoint);
                 sheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+            }
+        });
 
-
+        homeButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (sheetBehavior.getState() == BottomSheetBehavior.STATE_EXPANDED)
+                    sheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+                drawerLayout.openDrawer(GravityCompat.START);
             }
         });
 
@@ -107,6 +128,29 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
             @Override
             public void onSlide(@NonNull View bottomSheet, float slideOffset) {
                 //这里是拖拽中的回调，根据slideOffset可以做一些动画
+            }
+        });
+
+        navigationView.setNavigationItemSelectedListener(new NavigationView.OnNavigationItemSelectedListener() {
+            @Override
+            public boolean onNavigationItemSelected(@NonNull MenuItem menuItem) {
+                Intent intent = null;
+                switch (menuItem.getItemId()) {
+                    case R.id.nav_order:
+                        intent = new Intent(MapActivity.this, myOrderActivity.class);
+                        startActivity(intent);
+                        break;
+                    case R.id.nav_wallet:
+                        intent = new Intent(MapActivity.this, walletActivity.class);
+                        startActivity(intent);
+                        break;
+                    case R.id.nav_settings:
+                        intent = new Intent(MapActivity.this, settingsActivity.class);
+                        startActivity(intent);
+                        break;
+                    default:
+                }
+                return true;
             }
         });
     }
@@ -176,7 +220,7 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
         myLocationStyle.myLocationType(MyLocationStyle.LOCATION_TYPE_LOCATION_ROTATE_NO_CENTER);//连续定位、蓝点不会移动到地图中心点，定位点依照设备方向旋转，并且蓝点会跟随设备移动。
         myLocationStyle.interval(2000); //设置连续定位模式下的定位间隔，只在连续定位模式下生效，单次定位模式下不会生效。单位为毫秒。
         aMap.setMyLocationStyle(myLocationStyle);//设置定位蓝点的Style
-        aMap.getUiSettings().setMyLocationButtonEnabled(true);//设置默认定位按钮是否显示，非必需设置。
+        aMap.getUiSettings().setMyLocationButtonEnabled(false);//设置默认定位按钮是否显示，非必需设置
         aMap.setMyLocationEnabled(true);// 设置为true表示启动显示定位蓝点，false表示隐藏定位蓝点并不进行定位，默认是false。
         new Thread(new Runnable() {
             @Override
