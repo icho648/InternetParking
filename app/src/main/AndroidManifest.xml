@@ -28,13 +28,13 @@
     <uses-permission android:name="android.permission.READ_CONTACTS" />
 
     <application
+        android:name="org.litepal.LitePalApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/AppTheme"
-        android:name="org.litepal.LitePalApplication">
+        android:theme="@style/AppTheme">
         <meta-data
             android:name="com.amap.api.v2.apikey"
             android:value="794e5637be76b8e8f0a9366c970cb0f5" />
@@ -53,6 +53,7 @@
         <activity android:name=".activity.walletActivity" />
         <activity android:name=".activity.settingsActivity" />
         <activity android:name=".activity.myOrderActivity" />
+        <activity android:name=".activity.shareActivity"></activity>
     </application>
 
 </manifest>

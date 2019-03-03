@@ -155,6 +155,10 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
                         intent = new Intent(MapActivity.this, settingsActivity.class);
                         startActivity(intent);
                         break;
+                    case R.id.nav_share:
+                        intent = new Intent(MapActivity.this, shareActivity.class);
+                        startActivity(intent);
+                        break;
                     default:
                 }
                 return true;

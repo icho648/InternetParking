@@ -13,5 +13,5 @@
     <string name="wallet">钱包</string>
     <string name="settings">设置</string>
     <string name="reserve">预定</string>
-    <string name="title_activity_wallet">walletActivity</string>
+    <string name="share">分享车位</string>
 </resources>
