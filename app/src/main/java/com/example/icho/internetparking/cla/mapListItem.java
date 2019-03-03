@@ -5,12 +5,22 @@ public class mapListItem {
     private String info;
     private String price;
     private String available;
+    private String imageUrl;
 
-    public mapListItem(String title, String info, String price, String available) {
+    public mapListItem(String title, String info, String price, String available, String imageUrl) {
         this.title = title;
         this.info = info;
         this.price = price;
         this.available = available;
+        this.imageUrl = imageUrl;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
     }
 
     public String getTitle() {

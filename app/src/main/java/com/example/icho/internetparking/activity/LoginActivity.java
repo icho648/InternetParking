@@ -2,8 +2,11 @@ package com.example.icho.internetparking.activity;
 
 import android.Manifest;
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
@@ -22,6 +25,7 @@ import android.widget.Toast;
 import com.example.icho.internetparking.R;
 import com.example.icho.internetparking.utils.SharedPreferencesUtils;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -195,7 +199,7 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
         if (first) {
             //创建一个ContentVa对象（自定义的）设置不是第一次登录，,并创建记住密码和自动登录是默认不选，创建账号和密码为空
             helper.putValues(new SharedPreferencesUtils.ContentValue("first", false),
-                    new SharedPreferencesUtils.ContentValue("remenberPassword", false),
+                    new SharedPreferencesUtils.ContentValue("rememberPassword", false),
                     new SharedPreferencesUtils.ContentValue("autoLogin", false),
                     new SharedPreferencesUtils.ContentValue("name", ""),
                     new SharedPreferencesUtils.ContentValue("password", ""));
@@ -208,8 +212,11 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.btn_login:
-                loadUserName();    //无论如何保存一下用户名
-                login(); //登陆
+                if (isNetworkOnline()) {
+                    loadUserName();    //无论如何保存一下用户名
+                    login(); //登陆
+                } else
+                    Toast.makeText(this, "网络不可用，请检查您的网络连接", Toast.LENGTH_SHORT).show();
                 break;
             case R.id.iv_see_password:
                 setPasswordVisibility();    //改变图片并设置输入框的文本可见或不可见
@@ -446,6 +453,26 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
             }
         });
 
+    }
+
+    public boolean isNetworkConnected() {
+        ConnectivityManager connMgr = (ConnectivityManager)
+                getSystemService(Context.CONNECTIVITY_SERVICE);
+        assert connMgr != null;
+        NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
+        return (networkInfo != null && networkInfo.isConnected());
+    }
+
+    public boolean isNetworkOnline() {
+        Runtime runtime = Runtime.getRuntime();
+        try {
+            Process ipProcess = runtime.exec("ping -c 1 www.baidu.com");
+            int exitValue = ipProcess.waitFor();
+            return (exitValue == 0);
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
 }

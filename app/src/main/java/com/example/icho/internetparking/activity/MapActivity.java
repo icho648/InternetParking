@@ -1,6 +1,9 @@
 package com.example.icho.internetparking.activity;
 
+import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Handler;
 import android.os.Message;
 import android.support.design.widget.NavigationView;
@@ -49,6 +52,7 @@ import com.amap.api.services.core.PoiItem;
 import com.amap.api.services.poisearch.PoiResult;
 import com.amap.api.services.poisearch.PoiSearch;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -90,13 +94,16 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (!(listItems.isEmpty()))
-                    listItems.clear();//清空poi列表
-                aMap.clear();//清空标记
-                searchPoint=myPoint;
-                page = 1;
-                searchPoi(searchPoint);
-                sheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+                if (isNetworkOnline()) {
+                    if (!(listItems.isEmpty()))
+                        listItems.clear();//清空poi列表
+                    aMap.clear();//清空标记
+                    searchPoint = myPoint;
+                    page = 1;
+                    searchPoi(searchPoint);
+                    sheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+                } else
+                    Toast.makeText(MapActivity.this, "网络不可用，请检查您的网络连接", Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -168,6 +175,7 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
                 bundle.putString("title", item.getTitle());
                 bundle.putString("price", item.getPrice());
                 bundle.putString("available", item.getAvailable());
+                bundle.putString("imageUrl", item.getImageUrl());
                 intent.putExtras(bundle);
                 startActivity(intent);
             }
@@ -227,7 +235,12 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
             public void run() {
                 try {
                     while (myPoint == null) {
-                        Thread.sleep(50);
+                        if (isNetworkOnline())
+                            Thread.sleep(100);
+                        else {
+                            Toast.makeText(MapActivity.this, "网络不可用，请检查您的网络连接", Toast.LENGTH_SHORT).show();
+                            Thread.sleep(2000);
+                        }
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -308,7 +321,9 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
             LatLng latLng = new LatLng(item.getLatLonPoint().getLatitude(), item.getLatLonPoint().getLongitude());
             if (page==1)
                 aMap.addMarker(new MarkerOptions().position(latLng));
-            mapListItem listItem = new mapListItem(item.getTitle(), +item.getDistance() + "米  " + item.getSnippet(), "￥10/h", "有车位");
+            mapListItem listItem = new mapListItem(item.getTitle(), +item.getDistance() + "米  " + item.getSnippet(), "￥10/h", "有车位", "");
+            if (!item.getPhotos().isEmpty())
+                listItem.setImageUrl(item.getPhotos().get(0).getUrl());
             listItems.add(listItem);
         }
        adapter.notifyDataSetChanged();
@@ -343,6 +358,26 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
         super.onSaveInstanceState(outState);
         //在activity执行onSaveInstanceState时执行mMapView.onSaveInstanceState (outState)，保存地图当前的状态
         mapView.onSaveInstanceState(outState);
+    }
+
+    public boolean isNetworkConnected() {
+        ConnectivityManager connMgr = (ConnectivityManager)
+                getSystemService(Context.CONNECTIVITY_SERVICE);
+        assert connMgr != null;
+        NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
+        return (networkInfo != null && networkInfo.isConnected());
+    }
+
+    public boolean isNetworkOnline() {
+        Runtime runtime = Runtime.getRuntime();
+        try {
+            Process ipProcess = runtime.exec("ping -c 1 www.baidu.com");
+            int exitValue = ipProcess.waitFor();
+            return (exitValue == 0);
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
 

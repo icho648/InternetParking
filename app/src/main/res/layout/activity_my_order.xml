@@ -5,5 +5,11 @@
 
     <include layout="@layout/app_bar" />
 
+    <android.support.v7.widget.RecyclerView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_margin="@dimen/dp_10"
+        android:id="@+id/order_recycle_view" />
+
 
 </android.support.design.widget.AppBarLayout>
