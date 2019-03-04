@@ -13,6 +13,11 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 
 
+import com.amap.api.services.geocoder.GeocodeQuery;
+import com.amap.api.services.geocoder.GeocodeResult;
+import com.amap.api.services.geocoder.GeocodeSearch;
+import com.amap.api.services.geocoder.RegeocodeQuery;
+import com.amap.api.services.geocoder.RegeocodeResult;
 import com.chad.library.adapter.base.BaseQuickAdapter;
 import com.example.icho.internetparking.R;
 
@@ -33,6 +38,7 @@ import android.support.v7.widget.RecyclerView;
 import android.view.MenuItem;
 import android.view.View;
 
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -55,28 +61,34 @@ import com.amap.api.services.poisearch.PoiSearch;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import com.example.icho.internetparking.cla.mapListItem;
 import com.example.icho.internetparking.adapter.mapListItemAdapter;
 
-public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSearchListener {
-    MapView mapView = null;
-    AMap aMap = null;
+public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSearchListener, GeocodeSearch.OnGeocodeSearchListener {
+
     LatLonPoint myPoint = null;
     LatLonPoint searchPoint=null;
-    FloatingActionButton fab;
-    BottomSheetBehavior sheetBehavior;
+    GeocodeSearch geocodeSearch;
+    String cityCode = "";
     List<mapListItem> listItems = new ArrayList<>();
-    RecyclerView mapRecycleView = null;
     int page = 1;
     int pageCount = 0;
+    AMap aMap = null;
+    boolean isExit = false;
     mapListItemAdapter adapter = null;
+
+    MapView mapView = null;
+    FloatingActionButton fab;
+    BottomSheetBehavior sheetBehavior;
+    RecyclerView mapRecycleView = null;
     View bottomSheet=null;
-    boolean isExit=false;
     DrawerLayout drawerLayout = null;
     Button homeButton = null;
     EditText searchEdit = null;
     NavigationView navigationView = null;
+    Button searchButton = null;
 
     public void initViews(){
         mapView = findViewById(R.id.map);
@@ -88,6 +100,7 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
         homeButton = findViewById(R.id.button_home);
         searchEdit = findViewById(R.id.edit_search);
         navigationView = findViewById(R.id.nav_view);
+        searchButton = findViewById(R.id.button_search);
     }
 
     public void initEvents(){
@@ -100,8 +113,7 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
                     aMap.clear();//清空标记
                     searchPoint = myPoint;
                     page = 1;
-                    searchPoi(searchPoint);
-                    sheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+                    searchPoiAround();
                 } else
                     Toast.makeText(MapActivity.this, "网络不可用，请检查您的网络连接", Toast.LENGTH_SHORT).show();
             }
@@ -123,10 +135,12 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
                 switch (newState) {
                     case BottomSheetBehavior.STATE_COLLAPSED:
                         fab.setVisibility(View.VISIBLE);
-                        aMap.animateCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition(new LatLng(myPoint.getLatitude(), myPoint.getLongitude()), 16, 0, 0)));
+                        //aMap.animateCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition(new LatLng(myPoint.getLatitude(), myPoint.getLongitude()), 16, 0, 0)));
                         break;
                     case BottomSheetBehavior.STATE_EXPANDED:
                         fab.setVisibility(View.GONE);
+                        ((InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE)).
+                                hideSoftInputFromWindow(searchEdit.getWindowToken(), InputMethodManager.HIDE_NOT_ALWAYS);
                         break;
                     default:
                 }
@@ -141,7 +155,7 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
         navigationView.setNavigationItemSelectedListener(new NavigationView.OnNavigationItemSelectedListener() {
             @Override
             public boolean onNavigationItemSelected(@NonNull MenuItem menuItem) {
-                Intent intent = null;
+                Intent intent;
                 switch (menuItem.getItemId()) {
                     case R.id.nav_order:
                         intent = new Intent(MapActivity.this, myOrderActivity.class);
@@ -162,6 +176,28 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
                     default:
                 }
                 return true;
+            }
+        });
+
+        searchButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (searchEdit.getText().toString().isEmpty())
+                    Toast.makeText(MapActivity.this, "请输入搜索关键字", Toast.LENGTH_SHORT).show();
+                else {
+                    if (isNetworkOnline()) {
+                        if (!(listItems.isEmpty()))
+                            listItems.clear();//清空poi列表
+                        aMap.clear();//清空标记
+                        page = 1;
+                        RegeocodeQuery query = new RegeocodeQuery(myPoint, 200, GeocodeSearch.AMAP);//先查找本机所在城市
+                        geocodeSearch.getFromLocationAsyn(query);//在回调中进行处理
+                    } else
+                        Toast.makeText(MapActivity.this, "网络不可用，请检查您的网络连接", Toast.LENGTH_SHORT).show();
+
+
+                }
+
             }
         });
     }
@@ -195,7 +231,7 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
                         }
                         else {
                             page++;
-                            searchPoi(searchPoint);
+                            searchPoiAround();
                             adapter.loadMoreComplete();
                         }
                     }
@@ -234,6 +270,10 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
         aMap.setMyLocationStyle(myLocationStyle);//设置定位蓝点的Style
         aMap.getUiSettings().setMyLocationButtonEnabled(false);//设置默认定位按钮是否显示，非必需设置
         aMap.setMyLocationEnabled(true);// 设置为true表示启动显示定位蓝点，false表示隐藏定位蓝点并不进行定位，默认是false。
+
+        geocodeSearch = new GeocodeSearch(this);
+        geocodeSearch.setOnGeocodeSearchListener(this);
+
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -249,7 +289,7 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-                aMap.moveCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition(new LatLng(myPoint.getLatitude(), myPoint.getLongitude()), 18, 0, 0)));
+                aMap.moveCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition(new LatLng(myPoint.getLatitude(), myPoint.getLongitude()), 16, 0, 0)));
                 //参数依次是：视角调整区域的中心点坐标、希望调整到的缩放级别、俯仰角0°~45°（垂直与地图时为0）、偏航角 0~360° (正北方为0)
             }
         }).start();
@@ -259,16 +299,7 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
 
     }
 
-    @SuppressLint("HandlerLeak")
-    Handler mHandler = new Handler() {
 
-        @Override
-        public void handleMessage(Message msg) {
-            super.handleMessage(msg);
-            isExit = false;
-        }
-
-    };
 
     @SuppressLint("RestrictedApi")
     @Override
@@ -282,7 +313,12 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
             if (!isExit) {
                 isExit = true;
                 Toast.makeText(getApplicationContext(), "再按一次退出程序", Toast.LENGTH_SHORT).show();
-                mHandler.sendEmptyMessageDelayed(0, 2000);
+                new Handler().postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        isExit = false;
+                    }
+                }, 2000);
             } else {
                 finish();
             }
@@ -291,7 +327,7 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
 
     }
 
-    public void searchPoi(LatLonPoint searchPoint) {
+    public void searchPoiAround() {
         PoiSearch.Query query = new PoiSearch.Query("", "150900");
         //keyWord表示搜索字符串，
         //第二个参数表示POI搜索类型，二者选填其一，选用POI搜索类型时建议填写类型代码，码表可以参考下方（而非文字）
@@ -302,12 +338,8 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
         poiSearch.setOnPoiSearchListener(MapActivity.this);
         poiSearch.setBound(new PoiSearch.SearchBound(new LatLonPoint(searchPoint.getLatitude(), searchPoint.getLongitude()), 3000));
         poiSearch.searchPOIAsyn();
-        //if (page==1)
-            aMap.animateCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition(new LatLng(searchPoint.getLatitude() - 0.0055, searchPoint.getLongitude()), 16, 0, 0)));
-        //else
-            //aMap.animateCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition(new LatLng(searchPoint.getLatitude() - 0.009, searchPoint.getLongitude()), 15, 0, 0)));
-        //缩小地图并将POI移至上方
     }
+
 
     @Override
     public void onPoiItemSearched(PoiItem poiItem, int i) {
@@ -317,21 +349,28 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
 
     @Override
     public void onPoiSearched(PoiResult poiResult, final int i) {
+        if (i == 1000) {
+            pageCount = poiResult.getPageCount();
+            ArrayList<PoiItem> poiItems = poiResult.getPois();
 
-        pageCount = poiResult.getPageCount();
-        ArrayList<PoiItem> poiItems = poiResult.getPois();
-
-        for (PoiItem item : poiItems) {
-            LatLng latLng = new LatLng(item.getLatLonPoint().getLatitude(), item.getLatLonPoint().getLongitude());
-            if (page==1)
-                aMap.addMarker(new MarkerOptions().position(latLng));
-            mapListItem listItem = new mapListItem(item.getTitle(), +item.getDistance() + "米  " + item.getSnippet(), "￥10/h", "有车位", "");
-            if (!item.getPhotos().isEmpty())
-                listItem.setImageUrl(item.getPhotos().get(0).getUrl());
-            listItems.add(listItem);
+            for (PoiItem item : poiItems) {
+                LatLng latLng = new LatLng(item.getLatLonPoint().getLatitude(), item.getLatLonPoint().getLongitude());
+                if (page == 1)
+                    aMap.addMarker(new MarkerOptions().position(latLng));
+                mapListItem listItem = new mapListItem(item.getTitle(), +item.getDistance() + "米  " + item.getSnippet(), "￥10/h", "有车位", "");
+                if (!item.getPhotos().isEmpty())
+                    listItem.setImageUrl(item.getPhotos().get(0).getUrl());
+                listItems.add(listItem);
+            }
+            adapter.notifyDataSetChanged();
+            //if (page==1)
+            aMap.animateCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition(new LatLng(searchPoint.getLatitude() - 0.0055, searchPoint.getLongitude()), 16, 0, 0)));
+            //else
+            //aMap.animateCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition(new LatLng(searchPoint.getLatitude() - 0.009, searchPoint.getLongitude()), 15, 0, 0)));
+            //缩小地图并将POI移至上方
+            if (sheetBehavior.getState() != BottomSheetBehavior.STATE_EXPANDED)
+                sheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
         }
-       adapter.notifyDataSetChanged();
-
     }
 
 
@@ -364,13 +403,13 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
         mapView.onSaveInstanceState(outState);
     }
 
-    public boolean isNetworkConnected() {
+    /*public boolean isNetworkConnected() {
         ConnectivityManager connMgr = (ConnectivityManager)
                 getSystemService(Context.CONNECTIVITY_SERVICE);
         assert connMgr != null;
         NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
         return (networkInfo != null && networkInfo.isConnected());
-    }
+    }*/
 
     public boolean isNetworkOnline() {
         Runtime runtime = Runtime.getRuntime();
@@ -385,6 +424,22 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
     }
 
 
+    @Override
+    public void onRegeocodeSearched(RegeocodeResult regeocodeResult, int i) {
+        if (i == 1000) {
+            cityCode = regeocodeResult.getRegeocodeAddress().getCityCode();
+            GeocodeQuery query = new GeocodeQuery(searchEdit.getText().toString(), cityCode);
+            geocodeSearch.getFromLocationNameAsyn(query);
+        }
+    }
 
-
+    @Override
+    public void onGeocodeSearched(GeocodeResult geocodeResult, int i) {
+        if (i == 1000) {
+            searchPoint = geocodeResult.getGeocodeAddressList().get(0).getLatLonPoint();
+            LatLng latLng = new LatLng(searchPoint.getLatitude(), searchPoint.getLongitude());
+            aMap.addMarker(new MarkerOptions().position(latLng));
+            searchPoiAround();
+        }
+    }
 }
