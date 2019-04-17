@@ -52,7 +52,9 @@
                     android:hint="@string/input"
                     android:maxLines="1"
                     android:textColor="@android:color/black"
-                    android:textSize="@dimen/text_size_large" />
+                    android:textSize="@dimen/text_size_large"
+                    android:imeOptions="actionSearch"
+                    android:singleLine="true"/>
 
                 <Button
                     android:id="@id/button_search"

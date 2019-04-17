@@ -35,13 +35,16 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.view.KeyEvent;
 import android.view.MenuItem;
 import android.view.View;
 
+import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.amap.api.maps.AMap;
@@ -77,6 +80,7 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
     int pageCount = 0;
     AMap aMap = null;
     boolean isExit = false;
+    boolean isFirstOpen=true;
     mapListItemAdapter adapter = null;
 
     MapView mapView = null;
@@ -104,6 +108,28 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
     }
 
     public void initEvents(){
+        searchEdit.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+            @Override
+            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+                if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                    if (searchEdit.getText().toString().isEmpty())
+                        Toast.makeText(MapActivity.this, "请输入搜索关键字", Toast.LENGTH_SHORT).show();
+                    else {
+                        if (isNetworkOnline()) {
+                            if (!(listItems.isEmpty()))
+                                listItems.clear();//清空poi列表
+                            aMap.clear();//清空标记
+                            page = 1;
+                            RegeocodeQuery query = new RegeocodeQuery(myPoint, 200, GeocodeSearch.AMAP);//先查找本机所在城市
+                            geocodeSearch.getFromLocationAsyn(query);//在回调中进行处理
+                        } else
+                            Toast.makeText(MapActivity.this, "网络不可用，请检查您的网络连接", Toast.LENGTH_SHORT).show();
+                    }
+                }
+                return false;
+            }
+        });
+
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -260,6 +286,11 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
             @Override
             public void onMyLocationChange(Location location) {
                 myPoint = new LatLonPoint(location.getLatitude(), location.getLongitude());
+                if (isFirstOpen){
+                    aMap.moveCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition(new LatLng(myPoint.getLatitude(), myPoint.getLongitude()), 16, 0, 0)));
+                    //参数依次是：视角调整区域的中心点坐标、希望调整到的缩放级别、俯仰角0°~45°（垂直与地图时为0）、偏航角 0~360° (正北方为0)
+                    isFirstOpen=false;
+                }
             }
         });//监听位置改变
         UiSettings uiSettings = aMap.getUiSettings();
@@ -273,28 +304,6 @@ public class MapActivity extends AppCompatActivity implements PoiSearch.OnPoiSea
 
         geocodeSearch = new GeocodeSearch(this);
         geocodeSearch.setOnGeocodeSearchListener(this);
-
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    while (myPoint == null) {
-                        if (isNetworkOnline())
-                            Thread.sleep(100);
-                        else {
-                            Toast.makeText(MapActivity.this, "网络不可用，请检查您的网络连接", Toast.LENGTH_SHORT).show();
-                            Thread.sleep(2000);
-                        }
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-                aMap.moveCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition(new LatLng(myPoint.getLatitude(), myPoint.getLongitude()), 16, 0, 0)));
-                //参数依次是：视角调整区域的中心点坐标、希望调整到的缩放级别、俯仰角0°~45°（垂直与地图时为0）、偏航角 0~360° (正北方为0)
-            }
-        }).start();
-
-
 
 
     }

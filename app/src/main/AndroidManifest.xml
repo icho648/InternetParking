@@ -53,7 +53,7 @@
         <activity android:name=".activity.walletActivity" />
         <activity android:name=".activity.settingsActivity" />
         <activity android:name=".activity.myOrderActivity" />
-        <activity android:name=".activity.shareActivity"></activity>
+        <activity android:name=".activity.shareActivity"/>
     </application>
 
 </manifest>
